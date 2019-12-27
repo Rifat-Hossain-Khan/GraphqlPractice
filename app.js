@@ -2,10 +2,11 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const graphqlHttp = require("express-graphql");
 const { buildSchema } = require("graphql");
+const mongoose = require('mongoose');
+
+const Event = require('./models/event');
 
 const app = express();
-
-const events = [];
 
 app.use(bodyParser.json());
 
@@ -42,23 +43,44 @@ app.use("/graphql", graphqlHttp({
     `),
     rootValue: {
         events: () => {
-            return events;
+            return Event.find().
+                then(events => {
+                    return events.map(event => {
+                        // return { ...event._doc, _id: event._doc._id.toString() };
+                        return { ...event._doc, _id: event.id };
+                    });
+                }).catch(err => {
+                    console.log(err);
+                    throw err;
+                });
         },
-        createEvent: (args) => {
-            const event = {
-                _id: Math.random().toString(),
-                title: args.title,
-                description: args.description,
-                price: +args.price,
-                date: new Data().toISOString()
-            };
+        createEvent: ({ eventInput }) => {
+            const event = new Event({
+                title: eventInput.title,
+                description: eventInput.description,
+                price: +eventInput.price,
+                date: new Date(eventInput.date)
+            });
 
-            events.push(event);
+            return event.save()
+                .then((event) => {
+                    // console.log(event);
+                    // return { ...event._doc, _id: event._doc._id.toString() };
+                    return { ...event._doc, _id: event.id };
+                }).catch(err => {
+                    console.log(err);
+                    throw err;
+                });
+
         }
     },
     graphiql: true
 }));
 
-app.listen(3000, () => {
-    console.log("The server is running on port 3000");
-});
+mongoose.connect('mongodb://localhost:27017/graphqlprac', { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => {
+        app.listen(3000, () => {
+            console.log("The server is running on port 3000");
+        });
+    })
+    .catch(err => console.log(err));
